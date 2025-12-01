@@ -14,7 +14,7 @@ import { BLOG_NAME, FRIEND_LINK_CONTACT } from '../config';
 
 <BaseLayout title={`友情链接 | ${BLOG_NAME}`}>
   <div class="min-h-screen relative flex flex-col">
-    <ParticlesBackground client:load />
+    <ParticlesBackground client:idle />
     
     <Navbar 
       client:load
@@ -77,10 +77,10 @@ import { BLOG_NAME, FRIEND_LINK_CONTACT } from '../config';
         </div>
 
         <!-- Comment Section -->
-        <Comment client:load />
+        <Comment client:idle />
       </div>
 
-      <Footer client:load />
+      <Footer client:idle />
     </main>
   </div>
 

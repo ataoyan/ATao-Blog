@@ -58,7 +58,7 @@ const postsPerPage = HOME_PAGE.postsPerPage;
 
 <BaseLayout title={BLOG_NAME}>
   <div class="min-h-screen relative flex flex-col" id="app">
-    {HOME_PAGE.showParticles && FEATURES.particles && <ParticlesBackground client:load />}
+    {HOME_PAGE.showParticles && FEATURES.particles && <ParticlesBackground client:idle />}
     
     <Navbar 
       client:load
@@ -112,7 +112,7 @@ const postsPerPage = HOME_PAGE.postsPerPage;
 
         <div class="relative">
           {/* 右侧标签筛选器 */}
-          {HOME_PAGE.showTagFilters && <TagFilters client:load tags={allTags} />}
+          {HOME_PAGE.showTagFilters && <TagFilters client:idle tags={allTags} />}
           
           {/* 文章列表 */}
           <div class="grid grid-cols-1 gap-8 min-h-[200px]" id="posts-container" data-posts-per-page={postsPerPage}>
@@ -128,7 +128,7 @@ const postsPerPage = HOME_PAGE.postsPerPage;
               data-post-id={post.id}
             >
               <PostCard 
-                client:load
+                client:visible
                 post={{
                   id: post.id,
                   title: post.data.title,
@@ -167,7 +167,7 @@ const postsPerPage = HOME_PAGE.postsPerPage;
         </div>
       </div>
 
-      <Footer client:load />
+      <Footer client:idle />
     </main>
   </div>
 
