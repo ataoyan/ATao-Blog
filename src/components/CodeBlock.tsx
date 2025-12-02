@@ -189,9 +189,17 @@ export const CodeBlock = memo(({ language, children }: { language: string, child
 
         <div
         ref={codeContentRef}
-        className={`relative text-sm leading-relaxed overflow-hidden transition-all duration-300 ${isCollapsible && !isExpanded ? 'max-h-[400px]' : ''
+        className={`relative text-sm leading-relaxed transition-all duration-300 ${isCollapsible && !isExpanded ? 'max-h-[400px]' : ''
           }`}
-        style={{ fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace', fontWeight: 400 }}
+        style={{ 
+          fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace', 
+          fontWeight: 400,
+          overflow: 'auto',
+          willChange: 'scroll-position',
+          contain: 'layout style paint',
+          transform: 'translateZ(0)',
+          WebkitOverflowScrolling: 'touch'
+        }}
       >
         {isCollapsible && !isExpanded && (
           <div className={`absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t pointer-events-none z-10 ${isDark
@@ -224,7 +232,15 @@ export const CodeBlock = memo(({ language, children }: { language: string, child
         <SyntaxHighlighter
           language={language || 'text'}
           style={codeStyle}
-          customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace', fontWeight: 400 }}
+          customStyle={{ 
+            margin: 0, 
+            padding: '1rem', 
+            background: 'transparent', 
+            fontFamily: '"JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace', 
+            fontWeight: 400,
+            willChange: 'auto',
+            contain: 'layout style paint'
+          }}
           showLineNumbers={false}
           wrapLongLines={true}
           PreTag="div"

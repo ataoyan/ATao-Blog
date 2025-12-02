@@ -109,6 +109,8 @@ ol>li {
   display: flex;
   align-items: baseline;
   gap: 0;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 ol>li.has-list-number {
@@ -124,6 +126,8 @@ ul>li.standard-list-item {
   gap: 0;
   position: relative;
   padding-left: 0;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 /* Adjust bullet point position for baseline alignment */
@@ -190,6 +194,8 @@ ol ol>li {
   gap: 0;
   position: relative;
   padding-left: 0;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 /* Ensure nested ordered list items also get numbered */
@@ -376,12 +382,26 @@ table td {
   vertical-align: top;
 }
 
-/* Code block font override */
+/* Code block font override and performance optimization */
 pre[class*="language-"],
 code[class*="language-"],
 pre code {
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace !important;
   font-weight: 400 !important;
+}
+
+/* Optimize code block scrolling performance */
+pre[class*="language-"] {
+  contain: layout style paint;
+  will-change: scroll-position;
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optimize code block container scrolling */
+div[class*="syntax-highlighter"] {
+  contain: layout style paint;
+  will-change: auto;
 }
 
 /* Inline code - use same font family as body text but with monospace fallback */
