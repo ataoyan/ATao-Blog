@@ -72,14 +72,26 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
     const container = containerRef.current;
     if (!container) return;
 
-    // Use requestAnimationFrame for better performance
-    const rafId = requestAnimationFrame(() => {
+    // Use requestIdleCallback for better performance, fallback to setTimeout
+    const scheduleUpdate = (callback: () => void) => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(callback, { timeout: 2000 });
+      } else {
+        setTimeout(callback, 0);
+      }
+    };
+
+    const updateListNumbers = () => {
       // Find all ol elements within the container
       const allOlElements = container.querySelectorAll('ol');
       
       // Process all ol elements
       if (allOlElements.length === 0) return;
 
+      // Use DocumentFragment for batch DOM updates
+      const fragment = document.createDocumentFragment();
+      const updates: Array<{ li: HTMLLIElement; number: number }> = [];
+      
       // Collect all list items in depth-first order (matching markdown order)
       const allListItems: HTMLLIElement[] = [];
       
@@ -101,14 +113,18 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
         collectListItems(ol);
       });
       
-      // Now process all collected list items in order
+      // Batch prepare all updates
       allListItems.forEach((li, index) => {
         // Use the actual number from markdown if available, otherwise use sequential numbering
-        // The index matches the order in which items appear in markdown (depth-first)
         const actualNumber = index < parseOrderedListNumbers.length 
           ? parseOrderedListNumbers[index].number 
           : index + 1;
         
+        updates.push({ li, number: actualNumber });
+      });
+
+      // Batch apply updates
+      updates.forEach(({ li, number }) => {
         // Add class to hide ::before pseudo-element
         li.classList.add('has-list-number');
         
@@ -126,19 +142,20 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
             li.appendChild(numberSpan);
           }
         }
-        numberSpan.textContent = `${actualNumber}.`;
+        numberSpan.textContent = `${number}.`;
       });
-    });
-
-    return () => {
-      cancelAnimationFrame(rafId);
     };
+
+    scheduleUpdate(updateListNumbers);
   }, [content, parseOrderedListNumbers]);
 
   // Preprocess content to handle :::info, :::success, etc. syntax
   // Memoize the processing function to avoid recreating it on every render
   const processContent = useMemo(() => {
     return (text: string): string => {
+    // Early return for empty content
+    if (!text || text.trim().length === 0) return text;
+    
     let result = text;
     
     // CRITICAL: Fix nested ordered list indentation BEFORE any other processing
@@ -247,15 +264,8 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
       }
     });
 
-    // Handle video syntax: :::video{width:80%, align:center, ...} ::: or :::video{...}视频URL:::
-    // Support: width, align, autoplay, controls, loop, muted, caption
-    // Format 1: :::video{attrs}\n视频URL\n:::
-    // Format 2: :::video{attrs}视频URL:::
-    result = result.replace(/:::video\{([^}]*)\}\r?\n([\s\S]*?)\r?\n:::/g, (match: string, attrs: string, url: string) => {
-      const cleanUrl = url.trim();
-      if (!cleanUrl) return match;
-      
-      // Parse attributes
+    // Helper function to parse video attributes (reused for both formats)
+    const parseVideoAttrs = (attrs: string) => {
       const widthMatch = attrs.match(/width:\s*([^,}]+)/i);
       const alignMatch = attrs.match(/align:\s*(\w+)/i);
       const autoplayMatch = attrs.match(/autoplay:\s*(\w+)/i);
@@ -277,26 +287,31 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
         caption = afterCaption.replace(/\s*,\s*(align|width|autoplay|controls|loop|muted):.*$/i, '').trim();
       }
       
-      let dataAttrs = `data-video-url="${cleanUrl.replace(/"/g, '&quot;')}"`;
-      dataAttrs += ` data-video-align="${align}"`;
-      if (width) {
-        dataAttrs += ` data-video-width="${width}"`;
-      }
-      if (autoplay) {
-        dataAttrs += ` data-video-autoplay="true"`;
-      }
-      if (!controls) {
-        dataAttrs += ` data-video-controls="false"`;
-      }
-      if (loop) {
-        dataAttrs += ` data-video-loop="true"`;
-      }
-      if (muted) {
-        dataAttrs += ` data-video-muted="true"`;
-      }
-      if (caption) {
-        dataAttrs += ` data-video-caption="${caption.replace(/"/g, '&quot;')}"`;
-      }
+      return { width, align, autoplay, controls, loop, muted, caption };
+    };
+
+    const buildVideoAttrs = (url: string, attrs: ReturnType<typeof parseVideoAttrs>) => {
+      let dataAttrs = `data-video-url="${url.replace(/"/g, '&quot;')}"`;
+      dataAttrs += ` data-video-align="${attrs.align}"`;
+      if (attrs.width) dataAttrs += ` data-video-width="${attrs.width}"`;
+      if (attrs.autoplay) dataAttrs += ` data-video-autoplay="true"`;
+      if (!attrs.controls) dataAttrs += ` data-video-controls="false"`;
+      if (attrs.loop) dataAttrs += ` data-video-loop="true"`;
+      if (attrs.muted) dataAttrs += ` data-video-muted="true"`;
+      if (attrs.caption) dataAttrs += ` data-video-caption="${attrs.caption.replace(/"/g, '&quot;')}"`;
+      return dataAttrs;
+    };
+
+    // Handle video syntax: :::video{width:80%, align:center, ...} ::: or :::video{...}视频URL:::
+    // Support: width, align, autoplay, controls, loop, muted, caption
+    // Format 1: :::video{attrs}\n视频URL\n:::
+    // Format 2: :::video{attrs}视频URL:::
+    result = result.replace(/:::video\{([^}]*)\}\r?\n([\s\S]*?)\r?\n:::/g, (match: string, attrs: string, url: string) => {
+      const cleanUrl = url.trim();
+      if (!cleanUrl) return match;
+      
+      const parsedAttrs = parseVideoAttrs(attrs);
+      const dataAttrs = buildVideoAttrs(cleanUrl, parsedAttrs);
       
       return `<div ${dataAttrs} class="video-block"></div>`;
     });
@@ -306,48 +321,8 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
       const cleanUrl = url.trim();
       if (!cleanUrl) return match;
       
-      // Parse attributes (same as above)
-      const widthMatch = attrs.match(/width:\s*([^,}]+)/i);
-      const alignMatch = attrs.match(/align:\s*(\w+)/i);
-      const autoplayMatch = attrs.match(/autoplay:\s*(\w+)/i);
-      const controlsMatch = attrs.match(/controls:\s*(\w+)/i);
-      const loopMatch = attrs.match(/loop:\s*(\w+)/i);
-      const mutedMatch = attrs.match(/muted:\s*(\w+)/i);
-      const captionMatch = attrs.match(/caption:\s*([^,}]+)/i);
-      
-      const width = widthMatch ? widthMatch[1].trim() : '';
-      const align = alignMatch ? alignMatch[1].toLowerCase() : 'center';
-      const autoplay = autoplayMatch ? autoplayMatch[1].toLowerCase() === 'true' : false;
-      const controls = controlsMatch ? controlsMatch[1].toLowerCase() !== 'false' : true;
-      const loop = loopMatch ? loopMatch[1].toLowerCase() === 'true' : false;
-      const muted = mutedMatch ? mutedMatch[1].toLowerCase() === 'true' : false;
-      let caption = '';
-      const captionIndex = attrs.search(/caption:\s*/i);
-      if (captionIndex !== -1) {
-        const afterCaption = attrs.substring(captionIndex + 8);
-        caption = afterCaption.replace(/\s*,\s*(align|width|autoplay|controls|loop|muted):.*$/i, '').trim();
-      }
-      
-      let dataAttrs = `data-video-url="${cleanUrl.replace(/"/g, '&quot;')}"`;
-      dataAttrs += ` data-video-align="${align}"`;
-      if (width) {
-        dataAttrs += ` data-video-width="${width}"`;
-      }
-      if (autoplay) {
-        dataAttrs += ` data-video-autoplay="true"`;
-      }
-      if (!controls) {
-        dataAttrs += ` data-video-controls="false"`;
-      }
-      if (loop) {
-        dataAttrs += ` data-video-loop="true"`;
-      }
-      if (muted) {
-        dataAttrs += ` data-video-muted="true"`;
-      }
-      if (caption) {
-        dataAttrs += ` data-video-caption="${caption.replace(/"/g, '&quot;')}"`;
-      }
+      const parsedAttrs = parseVideoAttrs(attrs);
+      const dataAttrs = buildVideoAttrs(cleanUrl, parsedAttrs);
       
       return `<div ${dataAttrs} class="video-block"></div>`;
     });
@@ -356,40 +331,44 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
     // Support: type (info|success|warning|error), title (optional)
     const validTypes = ['info', 'success', 'warning', 'error'];
     
-    // Format 1: Multi-line: :::alert{type:info, title:标题}\ncontent\n:::
-    result = result.replace(/:::alert\{([^}]*)\}\r?\n([\s\S]*?)\r?\n:::/g, (match: string, attrs: string, content: string) => {
+    const parseAlertAttrs = (attrs: string) => {
       const typeMatch = attrs.match(/type:\s*(\w+)/i);
       const titleMatch = attrs.match(/title:\s*([^,}]+)/i);
       
       const type = typeMatch ? typeMatch[1].toLowerCase() : 'info';
       const normalizedType = validTypes.includes(type) ? type : 'info';
       const title = titleMatch ? titleMatch[1].trim() : '';
+      
+      return { normalizedType, title };
+    };
+    
+    const buildAlertHtml = (type: string, title: string, content: string) => {
+      const titleAttr = title ? ` data-alert-title="${title.replace(/"/g, '&quot;')}"` : '';
+      return `\n<div data-alert-type="${type}"${titleAttr} class="alert-block alert-${type}">\n\n${content}\n\n</div>\n`;
+    };
+    
+    // Format 1: Multi-line: :::alert{type:info, title:标题}\ncontent\n:::
+    result = result.replace(/:::alert\{([^}]*)\}\r?\n([\s\S]*?)\r?\n:::/g, (match: string, attrs: string, content: string) => {
+      const { normalizedType, title } = parseAlertAttrs(attrs);
       const cleanContent = content.trim();
       
       if (!cleanContent) {
         return match;
       }
       
-      const titleAttr = title ? ` data-alert-title="${title.replace(/"/g, '&quot;')}"` : '';
-      return `\n<div data-alert-type="${normalizedType}"${titleAttr} class="alert-block alert-${normalizedType}">\n\n${cleanContent}\n\n</div>\n`;
+      return buildAlertHtml(normalizedType, title, cleanContent);
     });
     
     // Format 2: Single-line: :::alert{type:info, title:标题}content:::
     result = result.replace(/:::alert\{([^}]*)\}([^\n]+?):::/g, (match: string, attrs: string, content: string) => {
-      const typeMatch = attrs.match(/type:\s*(\w+)/i);
-      const titleMatch = attrs.match(/title:\s*([^,}]+)/i);
-      
-      const type = typeMatch ? typeMatch[1].toLowerCase() : 'info';
-      const normalizedType = validTypes.includes(type) ? type : 'info';
-      const title = titleMatch ? titleMatch[1].trim() : '';
+      const { normalizedType, title } = parseAlertAttrs(attrs);
       const cleanContent = content.trim();
       
       if (!cleanContent) {
         return match;
       }
       
-      const titleAttr = title ? ` data-alert-title="${title.replace(/"/g, '&quot;')}"` : '';
-      return `\n<div data-alert-type="${normalizedType}"${titleAttr} class="alert-block alert-${normalizedType}">\n\n${cleanContent}\n\n</div>\n`;
+      return buildAlertHtml(normalizedType, title, cleanContent);
     });
     
     // Handle strikethrough syntax: ~~text~~ is handled by remark-gfm natively
@@ -558,8 +537,18 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
   }, []);
 
   // Memoize processed content to avoid reprocessing on every render
+  // Use a ref to cache the last processed content to avoid unnecessary reprocessing
+  const processedContentRef = useRef<{ content: string; processed: string } | null>(null);
+  
   const processedContent = useMemo(() => {
-    return processContent(content);
+    // Check if content hasn't changed
+    if (processedContentRef.current?.content === content) {
+      return processedContentRef.current.processed;
+    }
+    
+    const processed = processContent(content);
+    processedContentRef.current = { content, processed };
+    return processed;
   }, [content, processContent]);
 
   // Memoize components to avoid recreating on every render

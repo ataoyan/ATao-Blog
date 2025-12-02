@@ -206,7 +206,14 @@ const Tabs: React.FC<TabsProps> = ({ children }) => {
   // Track which tabs have been rendered (lazy render on first visit)
   const handleTabClick = (index: number) => {
     setActiveTab(index);
-    setRenderedTabs(prev => new Set([...prev, index]));
+    // Use requestIdleCallback for non-critical updates
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        setRenderedTabs(prev => new Set([...prev, index]));
+      }, { timeout: 100 });
+    } else {
+      setRenderedTabs(prev => new Set([...prev, index]));
+    }
   };
 
   return (
@@ -250,6 +257,7 @@ const Tabs: React.FC<TabsProps> = ({ children }) => {
               }`}
               style={{
                 willChange: activeTab === index ? 'contents' : 'auto',
+                contentVisibility: activeTab === index ? 'auto' : 'hidden',
               }}
             >
               <TabContent 
