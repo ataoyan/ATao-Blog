@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import Markdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +8,7 @@ import EChartsRenderer from './EChartsRenderer';
 import Tabs from './Tabs';
 import Timeline from './Timeline';
 import LinkCard from './LinkCard';
+import Chat from './Chat';
 import { CodeBlock } from './CodeBlock';
 import { baseMarkdownComponents, headingIdMap } from './MarkdownElements';
 import { extractText, slugify } from '../utils/markdown';
@@ -433,6 +434,28 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
     // This must come AFTER title processing to avoid conflicts
     result = result.replace(/\[([^\]]+)\]\(([^)]+)\)\s*\{([^}]+)\}/g, '<a href="$2" data-icon="$3">$1</a>');
     
+    // Handle chat syntax FIRST (before other ::: syntax to avoid conflicts)
+    // Handle chat syntax: :::chat\n@person name:xxx, avatar:xxx\nmessage\n@person name:yyy\nreply\n:::
+    result = result.replace(/:::chat\s*\r?\n([\s\S]*?)\r?\n:::/g, (match, content) => {
+      // Encode the chat content
+      const trimmedContent = content.trim();
+      if (!trimmedContent) return match; // Skip empty content
+      const encodedContent = encodeURIComponent(trimmedContent);
+      return `<div data-chat="true" data-chat-content="${encodedContent}"></div>`;
+    });
+    
+    // Also handle chat where closing ::: might be on same line or without preceding newline
+    result = result.replace(/:::chat\s*\r?\n([\s\S]*?):::/g, (match, content) => {
+      // Skip if already processed (contains data-chat attribute)
+      if (match.includes('data-chat="true"')) return match;
+      // Ensure content doesn't end with :::
+      const cleanContent = content.replace(/:::\s*$/, '').trim();
+      if (!cleanContent) return match;
+      // Encode the chat content
+      const encodedContent = encodeURIComponent(cleanContent);
+      return `<div data-chat="true" data-chat-content="${encodedContent}"></div>`;
+    });
+    
     // Handle tabs syntax: :::tabs\n@tab Label 1\nContent 1\n@tab Label 2\nContent 2\n:::
     // Convert to <div data-tabs="true"><div data-tab-label="Label 1">Content 1</div>...</div>
     // Relaxed regex: Do not enforce newline before closing ::: to allow for more robust matching
@@ -483,6 +506,28 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
       const finalTitle = title || content.trim() || '';
       
       return `<div data-link-card="true" data-link-url="${encodeURIComponent(url)}" data-link-title="${encodeURIComponent(finalTitle)}" data-link-description="${encodeURIComponent(description)}" data-link-image="${encodeURIComponent(image)}"></div>`;
+    });
+    
+    // Handle chat syntax: :::chat\n@person name:xxx, avatar:xxx\nmessage\n@person name:yyy\nreply\n:::
+    // Match chat block - use more flexible pattern
+    result = result.replace(/:::chat\s*\r?\n([\s\S]*?)\r?\n:::/g, (match, content) => {
+      // Encode the chat content
+      const trimmedContent = content.trim();
+      if (!trimmedContent) return match; // Skip empty content
+      const encodedContent = encodeURIComponent(trimmedContent);
+      return `<div data-chat="true" data-chat-content="${encodedContent}"></div>`;
+    });
+    
+    // Also handle chat where closing ::: might be on same line or without preceding newline
+    result = result.replace(/:::chat\s*\r?\n([\s\S]*?):::/g, (match, content) => {
+      // Skip if already processed (contains data-chat attribute)
+      if (match.includes('data-chat="true"')) return match;
+      // Ensure content doesn't end with :::
+      const cleanContent = content.replace(/:::\s*$/, '').trim();
+      if (!cleanContent) return match;
+      // Encode the chat content
+      const encodedContent = encodeURIComponent(cleanContent);
+      return `<div data-chat="true" data-chat-content="${encodedContent}"></div>`;
     });
     
     // Handle timeline syntax: :::timeline\n@item date | title\ncontent\n@item date | title\ncontent\n:::
@@ -722,6 +767,23 @@ const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRen
             const isTimeline = nodeProps['data-timeline'] === 'true' || (props as any)?.['data-timeline'] === 'true';
             if (isTimeline) {
               return <Timeline>{children}</Timeline>;
+            }
+
+            // Check if this is a chat container
+            const isChat = nodeProps['data-chat'] === 'true' || (props as any)?.['data-chat'] === 'true';
+            if (isChat) {
+              const chatContent = nodeProps['data-chat-content'] || (props as any)?.['data-chat-content'] || '';
+              
+              try {
+                if (chatContent) {
+                  const decodedContent = decodeURIComponent(chatContent);
+                  return <Chat>{decodedContent}</Chat>;
+                }
+                return null;
+              } catch (e) {
+                console.error('Failed to decode chat content:', e);
+                return null;
+              }
             }
 
             // Check if this is a link-card container

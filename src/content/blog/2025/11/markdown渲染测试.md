@@ -213,14 +213,32 @@ https://cdn.atao.cyou/Blog/blog_250312_222911.mp4
 
 ---
 
-## 11. 链接卡片
+## 11. 聊天对话
+
+:::chat
+@person name:ATao, avatar:https://cdn.atao.cyou/Web/Avatar.png
+你好，最近怎么样？ 😊
+@person name:Bob
+还不错，你呢？
+@person name:Steve, avatar:minecraft
+看这张图片！
+![示例图片](https://cdn.atao.cyou/Web/Avatar.png)
+@person name:ATao, avatar:https://cdn.atao.cyou/Web/Avatar.png
+我也很好！今天天气真不错 ☀️
+@person name:Bob
+太好了！👍
+:::  
+
+---
+
+## 12. 链接卡片
 
 :::link-card{url:https://ys.mihoyo.com/main/, title:原神, description:开放世界冒险RPG游戏，探索提瓦特大陆的奇幻之旅, image:https://webstatic.mihoyo.com/bh3/upload/officialsites/201908/ys_1565764084_7084.png}
 :::
 
 ---
 
-## 12. 提示
+## 13. 提示
 
 ### 12.1 info
 
@@ -248,7 +266,7 @@ https://cdn.atao.cyou/Blog/blog_250312_222911.mp4
 
 ---
 
-## 13. 图表
+## 14. 图表
 
 ### 13.1 折线图
 
