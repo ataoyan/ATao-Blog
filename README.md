@@ -46,6 +46,20 @@ npm run build
 npm run preview
 ```
 
+### 快速创建文章
+
+使用命令行工具快速创建新文章模板：
+
+```bash
+npm run new
+```
+
+脚本会提示你输入：
+- 文章标题（必填）
+- 发布日期（可选，格式：YYYY-MM-DD，默认使用今天）
+
+文章会自动创建到对应年月的文件夹中（如 `src/content/blog/2025/12/`），并生成包含基本 frontmatter 的模板文件。
+
 ## 📝 添加文章
 
 在 `src/content/blog/` 目录下创建新的 Markdown 文件。文件需要包含以下 frontmatter：
