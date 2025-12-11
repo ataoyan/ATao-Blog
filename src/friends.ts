@@ -166,4 +166,11 @@ export const FRIEND_LINKS: FriendLink[] = [
         avatar: "https://img.scdn.io/i/692d847f79589_1764590719.webp",
         addDate: "2025-12-02"
     },
+    {
+        name: "AlexMa's Blog",
+        description: "Create things with love.",
+        url: "https://blog.alexma.top/",
+        avatar: "https://blog-backend.alexma.top/api/v2/objects/avatar/112zjnt1f3c2cf3prp.webp",
+        addDate: "2025-12-11"
+    },
 ];
